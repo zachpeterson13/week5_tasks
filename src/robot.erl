@@ -28,12 +28,12 @@
 -behaviour(gen_statem).
 
 %% API
--export([start/2, start_link/2, stop/1, next/1]).
+-export([start/2, start_link/2, stop/1, to_up/1, to_down/1, to_close/1, to_open/1,
+         to_box/1, to_comp/1, get_state/1]).
 %% Supervisor Callbacks
 -export([terminate/3, code_change/4, init/1, callback_mode/0]).
 %% State Callbacks
--export([comp_up_open/3, comp_down_open/3, comp_down_close/3, comp_up_close/3,
-         box_up_close/3, box_down_close/3, box_down_open/3, box_up_open/3]).
+-export([handle_event/4]).
 
 %%%===================================================================
 %%% Public API functions
@@ -77,8 +77,26 @@ start_link(Statem_name, Initial_state) ->
 stop(Statem_name) ->
   gen_statem:stop(Statem_name).
 
-next(Statem_name) ->
-  gen_statem:call(Statem_name, next).
+to_up(Statem_name) ->
+  gen_statem:call(Statem_name, to_up).
+
+to_down(Statem_name) ->
+  gen_statem:call(Statem_name, to_down).
+
+to_close(Statem_name) ->
+  gen_statem:call(Statem_name, to_close).
+
+to_open(Statem_name) ->
+  gen_statem:call(Statem_name, to_open).
+
+to_comp(Statem_name) ->
+  gen_statem:call(Statem_name, to_comp).
+
+to_box(Statem_name) ->
+  gen_statem:call(Statem_name, to_box).
+
+get_state(Statem_name) ->
+  gen_statem:call(Statem_name, get_state).
 
 %% Mandatory callback functions
 %% @private
@@ -96,50 +114,28 @@ init([]) ->
 
 %% @private
 callback_mode() ->
-  state_functions.
+  handle_event_function.
 
 %%% state callback(s)
-comp_up_open({call, From}, next, Data) ->
+handle_event({call, From}, to_down, comp_up_open, Data) ->
   {next_state, comp_down_open, Data, [{reply, From, comp_down_open}]};
-comp_up_open(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-comp_down_open({call, From}, next, Data) ->
+handle_event({call, From}, to_close, comp_down_open, Data) ->
   {next_state, comp_down_close, Data, [{reply, From, comp_down_close}]};
-comp_down_open(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-comp_down_close({call, From}, next, Data) ->
+handle_event({call, From}, to_up, comp_down_close, Data) ->
   {next_state, comp_up_close, Data, [{reply, From, comp_up_close}]};
-comp_down_close(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-comp_up_close({call, From}, next, Data) ->
+handle_event({call, From}, to_box, comp_up_close, Data) ->
   {next_state, box_up_close, Data, [{reply, From, box_up_close}]};
-comp_up_close(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-box_up_close({call, From}, next, Data) ->
+handle_event({call, From}, to_down, box_up_close, Data) ->
   {next_state, box_down_close, Data, [{reply, From, box_down_close}]};
-box_up_close(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-box_down_close({call, From}, next, Data) ->
+handle_event({call, From}, to_open, box_down_close, Data) ->
   {next_state, box_down_open, Data, [{reply, From, box_down_open}]};
-box_down_close(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-box_down_open({call, From}, next, Data) ->
+handle_event({call, From}, to_up, box_down_open, Data) ->
   {next_state, box_up_open, Data, [{reply, From, box_up_open}]};
-box_down_open(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-box_up_open({call, From}, next, Data) ->
+handle_event({call, From}, to_comp, box_up_open, Data) ->
   {next_state, comp_up_open, Data, [{reply, From, comp_up_open}]};
-box_up_open(EventType, EventContent, Data) ->
-  handle_event(EventType, EventContent, Data).
-
-%% @private
-handle_event(_, _, Data) ->
+handle_event({call, From}, get_state, State, Data) ->
+  %% Reply with the current state
+  {next_state, State, Data, [{reply, From, State}]};
+handle_event({call, From}, _, State, Data) ->
   %% Ignore all other events
-  {keep_state, Data}.
+  {next_state, State, Data, [{reply, From, ignored_event}]}.
